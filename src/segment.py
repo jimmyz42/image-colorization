@@ -158,7 +158,7 @@ def get_color_points(filename):
 
     rgb = io.imread(auto_filename)
     lab = color.rgb2lab(rgb)
-    return [((pixel[0]/image_segment.shape[0], pixel[1]/image_segment.shape[1]), lab[pixel])
+    return [((1.0 * pixel[0]/image_segment.shape[0], 1.0 * pixel[1]/image_segment.shape[1]), lab[pixel])
             for pixel in sample_points]
 
 
