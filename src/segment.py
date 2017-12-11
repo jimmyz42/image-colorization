@@ -2,7 +2,7 @@ import scipy.misc
 import scipy.signal
 import numpy as np
 import random
-import queue
+from collections import deque
 from PIL import Image
 from skimage import io, color
 from os.path import join
@@ -92,17 +92,17 @@ class ImageSegment(object):
         seed = self.random_unlabeled_pixel()
         if self.verbose:
             print('Seed = %s' % (seed,))
-        newly_labeled = queue.Queue()
-        newly_labeled.put(seed)
+        newly_labeled = deque()
+        newly_labeled.append(seed)
         self.label_pixel(seed)
-        while not newly_labeled.empty():
-            pixel = newly_labeled.get()
+        while len(newly_labeled) > 0:
+            pixel = newly_labeled.popleft()
             if self.verbose:
                 print('Got pixel %s from queue' % (pixel,))
             for adjacent_pixel in self.adjacent_unlabeled_pixels(pixel):
                 if self.close_enough(adjacent_pixel, pixel):
                     self.label_pixel(adjacent_pixel, old_pixel=pixel)
-                    newly_labeled.put(adjacent_pixel)
+                    newly_labeled.append(adjacent_pixel)
         # self.check_rep()
 
     def segment(self):

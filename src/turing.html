@@ -1,0 +1,47 @@
+<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script>
+var img_urls = ["gre481.jpg", "gray.jpg"];
+var pick_real = Array(img_urls.length).fill(0);
+var pick_ours = Array(img_urls.length).fill(0);
+var img_index = 0;
+var real = (Math.random() < 0.5) ? 1 : 2;
+var fake = 3-real;
+
+function init() {
+    $('#im'+real).attr('src', 'original/' + img_urls[img_index]);
+    $('#im'+fake).attr('src', 'result/' + img_urls[img_index]);
+    $('#im'+real).off('click').click(function() {
+        pick_real[img_index]++;
+        img_index = (img_index+1) % img_urls.length;
+        real = (Math.random() < 0.5) ? 1 : 2;
+        fake = 3-real;
+        init();
+    });
+    $('#im'+fake).off('click').click(function() {
+        pick_ours[img_index]++;
+        img_index = (img_index+1) % img_urls.length;
+        real = (Math.random() < 0.5) ? 1 : 2;
+        fake = 3-real;
+        init();
+    });
+}
+
+$(function() {
+    init();   
+});
+</script>
+</head>
+<body style="width: 100%">
+<h1>Click the image that seems like the real image</h1>
+<p>(one of the images is real, and one is colorized by our algorithm</p>
+<div style="width: 50%; float: left; margin: auto">
+    <img width="256" height="256" id="im1"/>
+</div>
+<div style="width: 50%; float: right; margin: auto">
+    <img width="256" height="256" id="im2"/>
+</div>
+</body>
+</html>
+
