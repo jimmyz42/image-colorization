@@ -6,9 +6,10 @@ from collections import deque
 from PIL import Image
 from skimage import io, color
 from os.path import join
+import cv2
 
 class ImageSegment(object):
-    def __init__(self, image_filename, threshold=100, verbose=False):
+    def __init__(self, image_filename, verbose=False):
         self.image = scipy.misc.imread(image_filename, mode='L')
         # self.image = Image.open(image_filename)
         self.shape = self.image.shape
@@ -16,8 +17,9 @@ class ImageSegment(object):
         self.verbose = verbose
         unlabeled = set((row, col) for row in range(self.shape[0]) for col in range(self.shape[1]))
         self.segmentation = [unlabeled]
-        self.gradient = np.zeros(self.shape)
-        self.threshold = threshold
+        self.gradient = self.calculate_gradient()
+        self.threshold = 100
+        self.is_edge = cv2.Canny(self.image, 50, 200)
 
     def check_rep(self):
         for label in range(len(self.segmentation)):
@@ -28,6 +30,7 @@ class ImageSegment(object):
                 assert len(pixel) == 2
 
     def calculate_gradient(self):
+        """Calculate the gradient matrix"""
         kernel_x = np.array([[+1, 0, -1],
                              [+2, 0, -2],
                              [+1, 0, -1]])
@@ -36,14 +39,15 @@ class ImageSegment(object):
                              [-1, -2, -1]])
         gradient_x = scipy.signal.convolve2d(self.image, kernel_x, mode='same', boundary='symm')
         gradient_y = scipy.signal.convolve2d(self.image, kernel_y, mode='same', boundary='symm')
-        self.gradient = np.sqrt(gradient_x ** 2 + gradient_y ** 2)
+        return np.sqrt(gradient_x ** 2 + gradient_y ** 2)
 
     def segment_high_gradient(self):
         self.segmentation.append(set())
         for row in range(self.shape[0]):
             for col in range(self.shape[1]):
                 pixel = (row, col)
-                if self.gradient[pixel] >= self.threshold:
+                if self.is_edge[pixel]:
+                # if self.gradient[pixel] >= self.threshold:
                     self.label[pixel] = 1
                     self.segmentation[0].remove(pixel)
                     self.segmentation[1].add(pixel)
@@ -62,11 +66,6 @@ class ImageSegment(object):
             rows = range(pixel[0] - 1, pixel[0] + 2)
             cols = range(pixel[1] - 1, pixel[1] + 2)
             return [(row, col) for row in rows for col in cols if (row, col) in self.segmentation[0]]
-
-    def close_enough(self, old_pixel, new_pixel):
-        return True
-        return (self.gradient[new_pixel] < self.threshold) == (self.gradient[old_pixel] < self.threshold)
-        # return abs(self.image[new_pixel] - self.image[old_pixel]) < 5
 
     def label_pixel(self, pixel, old_pixel=None):
         assert type(pixel) is tuple
@@ -100,9 +99,8 @@ class ImageSegment(object):
             if self.verbose:
                 print('Got pixel %s from queue' % (pixel,))
             for adjacent_pixel in self.adjacent_unlabeled_pixels(pixel):
-                if self.close_enough(adjacent_pixel, pixel):
-                    self.label_pixel(adjacent_pixel, old_pixel=pixel)
-                    newly_labeled.append(adjacent_pixel)
+                self.label_pixel(adjacent_pixel, old_pixel=pixel)
+                newly_labeled.append(adjacent_pixel)
         # self.check_rep()
 
     def segment(self):
@@ -156,7 +154,7 @@ def get_color_points(filename):
     bw_filename = join('../img/bw', filename)
     image_segment = ImageSegment(bw_filename, verbose=False)
     sample_points = image_segment.run()
-    image_segment.save_segmentation(join('../img/segment', filename))
+    image_segment.save_segmentation(join('../img/segment', filename[:-3] + 'png'))
 
     rgb = io.imread(auto_filename)
     lab = color.rgb2lab(rgb)
