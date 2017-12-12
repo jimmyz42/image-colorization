@@ -29,7 +29,7 @@ class ImageSegment(object):
         self.gradient = self.calculate_gradient()
         self.threshold = 100
         self.is_edge = cv2.Canny(self.image, 50, 200)
-        # self.fix_edge()
+        self.fix_edge()
 
     def check_rep(self):
         for label in range(len(self.segmentation)):
