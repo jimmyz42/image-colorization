@@ -1,6 +1,7 @@
 # libraries
 caffe/
 ideepcolor/
+colorization/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -105,5 +106,6 @@ ENV/
 .mypy_cache/
 .idea
 img
+old
 output
 img.zip

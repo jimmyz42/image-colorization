@@ -29,7 +29,7 @@ class ImageSegment(object):
         self.gradient = self.calculate_gradient()
         self.threshold = 100
         self.is_edge = cv2.Canny(self.image, 50, 200)
-        # self.fix_edge()
+        self.fix_edge()
 
     def check_rep(self):
         for label in range(len(self.segmentation)):
@@ -45,7 +45,7 @@ class ImageSegment(object):
                 direction = self.potential_direction(row, col)
                 if direction is None:
                     continue
-                print('direction is not None for pixel: %s' % ((row, col),))
+                #print('direction is not None for pixel: %s' % ((row, col),))
                 opposite_direction = self.opposite_direction(direction)
                 opposite_pixel = self.add_pixels((row, col), opposite_direction)
                 if not (0 <= opposite_pixel[0] < self.image.shape[0] and 0 <= opposite_pixel[1] < self.image.shape[1]):
@@ -53,9 +53,9 @@ class ImageSegment(object):
                 for d in self.positions(opposite_direction):
                     check_pixel = self.add_pixels((row, col), d)
                     if 0 <= check_pixel[0] < self.image.shape[0] and 0 <= check_pixel[1] < self.image.shape[1]:
-                        print('Got one check_pixel %s for pixel: %s' % (check_pixel, (row, col),))
+                        #print('Got one check_pixel %s for pixel: %s' % (check_pixel, (row, col),))
                         if self.is_edge[check_pixel]:
-                            print('Add one edge at %s for pixel: %s' % (self.add_pixels((row, col), direction), (row, col),))
+                            #print('Add one edge at %s for pixel: %s' % (self.add_pixels((row, col), direction), (row, col),))
                             self.is_edge[self.add_pixels((row, col), opposite_direction)] = 255
 
     def positions(self, direction):
