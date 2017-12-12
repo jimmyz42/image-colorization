@@ -2,7 +2,8 @@
 <head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script>
-var img_urls = ["gre481.jpg", "gray.jpg"];
+// Use this web page for forced-choice test between auto-colorized result (step 1) and original image
+var img_urls = ['barbershop1.jpg', 'barbershop2.jpg', 'can_opener1.jpg', 'can_opener2.jpg', 'can_opener3.jpg', 'chain1.jpg', 'chain2.jpg', 'chain3.jpg', 'chain4.jpg', 'chain5.jpg', 'dog1.jpg', 'dog2.jpg', 'dog3.jpg', 'dog4.jpg', 'dog5.jpg', 'dog6.jpg', 'dog7.jpg', 'modern1.jpg', 'modern2.jpg', 'modern3.jpg', 'modern4.jpg', 'modern5.jpg', 'track1.jpg', 'track2.jpg', 'track3.jpg', 'track4.jpg', 'track5.jpg', 'track6.jpg', 'wok1.jpg', 'wok2.jpg'];
 var pick_real = Array(img_urls.length).fill(0);
 var pick_ours = Array(img_urls.length).fill(0);
 var img_index = 0;
@@ -10,8 +11,8 @@ var real = (Math.random() < 0.5) ? 1 : 2;
 var fake = 3-real;
 
 function init() {
-    $('#im'+real).attr('src', 'original/' + img_urls[img_index]);
-    $('#im'+fake).attr('src', 'result/' + img_urls[img_index]);
+    $('#im'+real).attr('src', 'img/original/better-2/' + img_urls[img_index]);
+    $('#im'+fake).attr('src', 'img/auto/better-2/' + img_urls[img_index]);
     $('#im'+real).off('click').click(function() {
         pick_real[img_index]++;
         img_index = (img_index+1) % img_urls.length;
@@ -29,7 +30,7 @@ function init() {
 }
 
 $(function() {
-    init();   
+    init();    
 });
 </script>
 </head>
@@ -44,4 +45,3 @@ $(function() {
 </div>
 </body>
 </html>
-
