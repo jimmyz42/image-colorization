@@ -7,19 +7,110 @@ from PIL import Image
 from skimage import io, color
 from os.path import join
 import cv2
+from sklearn.cluster import KMeans
+
+class Region(object):
+    def __init__(self, lab_image, unlabeled_pixels_set, id):
+        self.id = id
+        self.lab_image = lab_image
+        self.shape = lab_image.shape
+        seed = random.sample(unlabeled_pixels_set, 1)[0]
+        self.pixels = set()
+        self.connected_regions = {}
+        self.color = None
+
+        self.verbose = False
+        if self.verbose:
+            print('---------------------Begin segmenting one new region')
+            print('Seed = %s' % (seed,))
+        newly_labeled = deque()
+        newly_labeled.append(seed)
+        self.pixels.add(seed)
+        unlabeled_pixels_set.remove(seed)
+        while len(newly_labeled) > 0:
+            pixel = newly_labeled.popleft()
+            if self.verbose:
+                print('Got pixel %s from queue' % (pixel,))
+            for adjacent_pixel in self.adjacent_unlabeled_pixels(pixel, unlabeled_pixels_set):
+                self.pixels.add(adjacent_pixel)
+                unlabeled_pixels_set.remove(adjacent_pixel)
+                newly_labeled.append(adjacent_pixel)
+                # self.check_rep()
+
+    def connect_to(self, region, gradient):
+        assert region != self
+        if region not in self.connected_regions:
+            self.connected_regions[region] = (1, gradient)
+        else:
+            new_num = self.connected_regions[region][0]
+            new_weight = (self.connected_regions[region][1] + gradient) / (new_num * 1.0)
+            self.connected_regions[region] = (new_num, new_weight)
+
+    def get_color(self):
+        return self.color
+
+    def decide_color(self):
+        assert self.color is None
+        bad_colors = {}
+        for region, weight in self.connected_regions:
+            if region.get_color() is not None and weight > 10:
+                bad_colors[region.get_color()] = weight ** 0.5
+
+        abs = np.zeros((len(self.pixels), 2))
+        abs = []
+        for pixel in self.pixels:
+            ab = self.lab_image[pixel][1:3]
+            close_to_adjacent_colors = False
+            for bad_color, radius in bad_colors:
+                if ((ab[0] - bad_color[0])**2 + (ab[1] - bad_color[1])**2)**0.5 < radius:
+                    close_to_adjacent_colors = True
+            if not close_to_adjacent_colors:
+                abs.append(ab)
+
+        if len(abs) == 0:
+            print('Region %d with size %d gets zero pixels remained' % (self.id, len(self.pixels)))
+            # TODO: may change color here
+            pixel = random.sample(self.pixels, 1)[0]
+            abs.append(self.lab_image[pixel][1:3])
+
+        abs = np.array(abs)
+        kmeans = KMeans(n_clusters=8).fit(abs)
+        numbers = [0] * kmeans.cluster_centers_.shape[0]
+        for label in kmeans.labels_:
+            numbers[label] += 1
+        chosen_color = kmeans.cluster_centers_[numbers.index(max(numbers))]
+        return tuple(chosen_color)
+
+    def adjacent_unlabeled_pixels(self, pixel, unlabeled_pixels_set, mode='cross'):
+        assert type(pixel) is tuple
+        row = pixel[0]
+        col = pixel[1]
+        if mode == 'cross':
+            pixels = [(row, col), (row + 1, col), (row - 1, col), (row, col + 1), (row, col - 1)]
+            return [p for p in pixels if p in unlabeled_pixels_set]
+        elif mode == '3x3':
+            rows = range(pixel[0] - 1, pixel[0] + 2)
+            cols = range(pixel[1] - 1, pixel[1] + 2)
+            return [(row, col) for row in rows for col in cols if (row, col) in unlabeled_pixels_set]
+
+    def __hash__(self):
+        return id
+
 
 class ImageSegment(object):
-    def __init__(self, image_filename, verbose=False):
-        self.image = scipy.misc.imread(image_filename, mode='L')
-        # self.image = Image.open(image_filename)
-        self.shape = self.image.shape
-        self.label = np.zeros(self.shape, dtype=np.int32)
+    def __init__(self, bw_image_filename, color_image_filename, verbose=False):
+        self.bw_image = scipy.misc.imread(bw_image_filename, mode='L')
+        self.color_image = scipy.misc.imread(color_image_filename, mode='RGB')
+        self.lab_image = color.rgb2lab(self.color_image)
+        assert self.bw_image.shape == self.color_image.shape
+        self.shape = self.bw_image.shape
         self.verbose = verbose
-        unlabeled = set((row, col) for row in range(self.shape[0]) for col in range(self.shape[1]))
-        self.segmentation = [unlabeled]
+        self.unlabeled = set((row, col) for row in range(self.shape[0]) for col in range(self.shape[1]))
         self.gradient = self.calculate_gradient()
         self.threshold = 100
-        self.is_edge = cv2.Canny(self.image, 50, 200)
+        self.is_edge = cv2.Canny(self.bw_image, 50, 200)
+        self.label = -1 - self.is_edge # All edges are labeled -256, unlabeled are -1
+        self.regions = []
 
     def check_rep(self):
         for label in range(len(self.segmentation)):
@@ -37,35 +128,9 @@ class ImageSegment(object):
         kernel_y = np.array([[+1, +2, +1],
                              [ 0,  0,  0],
                              [-1, -2, -1]])
-        gradient_x = scipy.signal.convolve2d(self.image, kernel_x, mode='same', boundary='symm')
-        gradient_y = scipy.signal.convolve2d(self.image, kernel_y, mode='same', boundary='symm')
+        gradient_x = scipy.signal.convolve2d(self.bw_image, kernel_x, mode='same', boundary='symm')
+        gradient_y = scipy.signal.convolve2d(self.bw_image, kernel_y, mode='same', boundary='symm')
         return np.sqrt(gradient_x ** 2 + gradient_y ** 2)
-
-    def segment_high_gradient(self):
-        self.segmentation.append(set())
-        for row in range(self.shape[0]):
-            for col in range(self.shape[1]):
-                pixel = (row, col)
-                if self.is_edge[pixel]:
-                # if self.gradient[pixel] >= self.threshold:
-                    self.label[pixel] = 1
-                    self.segmentation[0].remove(pixel)
-                    self.segmentation[1].add(pixel)
-
-    def random_unlabeled_pixel(self):
-        return random.sample(self.segmentation[0], 1)[0]
-
-    def adjacent_unlabeled_pixels(self, pixel, mode='cross'):
-        assert type(pixel) is tuple
-        row = pixel[0]
-        col = pixel[1]
-        if mode == 'cross':
-            pixels = [(row, col), (row + 1, col), (row - 1, col), (row, col + 1), (row, col - 1)]
-            return [p for p in pixels if p in self.segmentation[0]]
-        elif mode == '3x3':
-            rows = range(pixel[0] - 1, pixel[0] + 2)
-            cols = range(pixel[1] - 1, pixel[1] + 2)
-            return [(row, col) for row in rows for col in cols if (row, col) in self.segmentation[0]]
 
     def label_pixel(self, pixel, old_pixel=None):
         assert type(pixel) is tuple
@@ -85,34 +150,19 @@ class ImageSegment(object):
             if self.verbose:
                 print('Add pixel pixel %s to existing label %d' % (pixel, label))
 
-    def segment_one_region(self):
-        if self.verbose:
-            print('---------------------Begin segmenting one new region')
-        seed = self.random_unlabeled_pixel()
-        if self.verbose:
-            print('Seed = %s' % (seed,))
-        newly_labeled = deque()
-        newly_labeled.append(seed)
-        self.label_pixel(seed)
-        while len(newly_labeled) > 0:
-            pixel = newly_labeled.popleft()
-            if self.verbose:
-                print('Got pixel %s from queue' % (pixel,))
-            for adjacent_pixel in self.adjacent_unlabeled_pixels(pixel):
-                self.label_pixel(adjacent_pixel, old_pixel=pixel)
-                newly_labeled.append(adjacent_pixel)
-        # self.check_rep()
-
     def segment(self):
         if self.verbose:
             print('Begin segmenting')
-        self.segment_high_gradient()
-        while len(self.segmentation[0]) != 0:
+        while len(self.unlabeled) != 0:
             if self.verbose:
-                print('There are %d unlabeled pixels left' % len(self.segmentation[0]))
-            self.segment_one_region()
+                print('There are %d unlabeled pixels left' % len(self.unlabeled))
+            new_region = Region(self.lab_image, self.unlabeled, len(self.regions))
+            self.regions.append(new_region)
         if self.verbose:
             print('Finished segmenting')
+
+    def choose_color(self):
+        self.regions.sort(self.regions, key=lambda region: region.)
 
     def random_color(self):
         return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
