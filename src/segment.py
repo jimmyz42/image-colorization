@@ -115,7 +115,7 @@ class Region(object):
         if self.size < 10:
             return []
         num = max(1, int(self.size / 1000))
-        print('sample %d points for region %d' % (num, self.ID))
+        #print('sample %d points for region %d' % (num, self.ID))
         points = random.sample(self.pixels, num)
         return [((point[0] * 1.0 / self.shape[0], point[1] * 1.0 / self.shape[1]), (0, self.color[0], self.color[1])) for point in points]
 
